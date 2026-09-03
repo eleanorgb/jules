@@ -19,12 +19,14 @@ USE string_utils_mod, ONLY: to_string
 USE jules_surface_types_mod, ONLY: npft, nnpft
 
 USE jules_vegetation_mod, ONLY: l_triffid, l_phenol, l_trif_crop, l_ag_expand, &
-                                l_trif_biocrop
+                                l_trif_biocrop, l_soil_pyc
 
 USE trif, ONLY: crop, harvest_type, harvest_freq, ag_expand,                   &
                 g_area, g_grow, g_root, g_wood, lai_max, lai_min,              &
                 alloc_fast, alloc_med, alloc_slow, dpm_rpm_ratio,              &
-                retran_r, retran_l, harvest_ht
+                burnt_veg_to_atmos_frac, burnt_veg_to_inert_frac,              &
+                retran_r, retran_l, harvest_ht, burnt_veg_to_rpm_frac,         &
+                tau_pyc
 
 USE trif_io, ONLY: jules_triffid,                                              &
                          crop_io, harvest_type_io, harvest_freq_io,            &
@@ -32,7 +34,9 @@ USE trif_io, ONLY: jules_triffid,                                              &
                          g_wood_io,lai_max_io,lai_min_io,                      &
                          alloc_fast_io,alloc_med_io,alloc_slow_io,             &
                          dpm_rpm_ratio_io,retran_l_io,retran_r_io,             &
-                         harvest_ht_io
+                         harvest_ht_io, burnt_veg_to_atmos_frac_io,            &
+                         burnt_veg_to_inert_frac_io, burnt_veg_to_rpm_frac_io, &
+                         tau_pyc_io
 
 USE errormessagelength_mod, ONLY: errormessagelength
 
@@ -106,6 +110,7 @@ crop(:)    = crop_io(1:npft)
 harvest_freq(:)    = harvest_freq_io(1:npft)
 harvest_type(:)    = harvest_type_io(1:npft)
 ag_expand(:)       = ag_expand_io(1:npft)
+burnt_veg_to_atmos_frac(:) = burnt_veg_to_atmos_frac_io(1:npft)
 g_area(:)  = g_area_io(1:npft)
 g_grow(:)  = g_grow_io(1:npft)
 g_root(:)  = g_root_io(1:npft)
@@ -116,6 +121,9 @@ alloc_fast(:) = alloc_fast_io(1:npft)
 alloc_med(:)  = alloc_med_io(1:npft)
 alloc_slow(:) = alloc_slow_io(1:npft)
 dpm_rpm_ratio(:) = dpm_rpm_ratio_io(1:npft)
+burnt_veg_to_rpm_frac(:)      = burnt_veg_to_rpm_frac_io(1:npft)
+burnt_veg_to_inert_frac(:) = burnt_veg_to_inert_frac_io(1:npft)
+tau_pyc = tau_pyc_io
 retran_r(:)   = retran_r_io(1:npft)
 retran_l(:)   = retran_l_io(1:npft)
 harvest_ht(:) = harvest_ht_io(1:npft)
@@ -168,6 +176,18 @@ END IF
 IF ( ANY( ABS( dpm_rpm_ratio(1:nnpft) - rmdi ) < EPSILON(1.0) ) ) THEN
   ERROR = 1
   CALL log_error("init_triffid", "No value for dpm_rpm_ratio")
+END IF
+IF ( ANY( ABS( burnt_veg_to_atmos_frac(1:nnpft) - rmdi ) < EPSILON(1.0) ) ) THEN
+  ERROR = 1
+  CALL log_error("init_triffid", "No value for burnt_veg_to_atmos_frac")
+END IF
+IF ( ANY( ABS( burnt_veg_to_inert_frac(1:nnpft) - rmdi ) < EPSILON(1.0) ) ) THEN
+  ERROR = 1
+  CALL log_error("init_triffid", "No value for burnt_veg_to_inert_frac")
+END IF
+IF (  ABS( tau_pyc - rmdi ) < EPSILON(1.0) ) THEN
+  ERROR = 1
+  CALL log_error("init_triffid", "No value for tau_pyc")
 END IF
 IF ( ANY( ABS( retran_r(1:nnpft) - rmdi ) < EPSILON(1.0) ) ) THEN
   ERROR = 1

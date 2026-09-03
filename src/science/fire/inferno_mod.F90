@@ -255,8 +255,8 @@ IF (rhum_l > rhum_up)  f_rhum_l = 0.0
 f_sm_l    = (1 - sm_l)
   ! The flammability goes down linearly with soil moisture
 
-rain_rate = rain_l * s_in_day
-  ! convert rain rate from kg/m2/s to mm/day
+rain_rate = rain_l ! ejb this line is erroneous with double counting * s_in_day
+  ! ejb error - convert rain rate from kg/m2/s to mm/day
 
 flam_l    = MAX(MIN(10.0**Z_l * f_rhum_l * fuel_l * f_sm_l                     &
                      * EXP( cr * rain_rate) ,1.0) ,0.0)

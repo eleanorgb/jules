@@ -36,7 +36,8 @@ USE jules_vegetation_mod, ONLY: can_model, can_rad_mod,                        &
                                 l_nitrogen, l_prescsow, l_trif_crop,           &
                                 photo_acclim_model, photo_adapt,               &
                                 photo_acclim, photo_adapt_acclim,              &
-                                l_croprotate, l_trif_biocrop, l_sugar, l_red
+                                l_croprotate, l_trif_biocrop, l_sugar,         &
+                                l_trif_fire, l_soil_pyc, l_red
 
 USE jules_water_resources_mod, ONLY: l_water_irrigation, l_water_resources,    &
        nwater_use, partition_ancil, partition_method, use_environment
@@ -243,6 +244,11 @@ IF ( l_triffid .AND. l_landuse ) THEN
     CALL add_to_list( 'frac_biocrop_prev', nvars, identifiers )
   END IF
 
+END IF
+
+IF ( l_trif_fire .AND. l_soil_pyc ) THEN
+  ! add inert pool to list
+  CALL add_to_list( 'inert_pyc', nvars, identifiers )
 END IF
 
 IF ( soil_bgc_model == soil_model_4pool .AND. l_nitrogen ) THEN

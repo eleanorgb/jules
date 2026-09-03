@@ -9367,4 +9367,56 @@ DATA metadata(723) / var_metadata(                                             &
 ! Units
     "kg m-2 s-1"                                                               &
   ) /
+!-----------------------------------------------------------------------------
+! Metadata for lit_c_fire_gb
+!-----------------------------------------------------------------------------
+DATA metadata(724) / var_metadata(                                            &
+! String identifier
+    'lit_c_fire_gb',                                                          &
+! Variable type
+    var_type_surface,                                                         &
+! Long name
+    "gridbox carbon litter due to fire",                                      &
+! Units
+    "kg m-2 per 360days"                                                      &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for inert_pyc
+!-----------------------------------------------------------------------------
+DATA metadata(725) / var_metadata(                                            &
+! String identifier
+    'inert_pyc',                                                              &
+! Variable type
+    var_type_sclayer,                                                         &
+! Long name
+    "Amount of pyrogenic carbon in soil inert pool",                          &
+! Units
+    "kg m-2"                                                                  &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for resp_pyc_gb
+!-----------------------------------------------------------------------------
+DATA metadata(726) / var_metadata(                                            &
+! String identifier
+    'resp_pyc_gb',                                                            &
+! Variable type
+    var_type_sclayer,                                                         &
+! Long name
+    "Flux of Carbon from pyc inert pool",                                     &
+! Units
+    "kg m-2 per 360days"                                                      &
+  ) /
+!-----------------------------------------------------------------------------
+! Metadata for lit_c_fire_to_pyc_gb
+!-----------------------------------------------------------------------------
+DATA metadata(727) / var_metadata(                                            &
+! String identifier
+    'lit_c_fire_to_pyc_gb',                                                   &
+! Variable type
+    var_type_surface,                                                         &
+! Long name
+    "gridbox carbon litter to pyc pool due to fire",                          &
+! Units
+    "kg m-2 per 360days"                                                      &
+  ) /
 #endif

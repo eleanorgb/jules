@@ -118,6 +118,8 @@ TYPE :: progs_data_type
     ! 2  resistant plant material
     ! 3  biomass
     ! 4  humus
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: pyc_inert_c_pool_gb(:,:)
+    ! pyc pool
   REAL(KIND=real_jlslsm), ALLOCATABLE :: frac_c_label_pool_soilt(:,:,:,:)
     ! fraction of soil carbon that is labelled and traced
     ! pools as for cs_pool_soilt
@@ -228,6 +230,7 @@ TYPE :: progs_type
   REAL(KIND=real_jlslsm), POINTER :: canopy_surft(:,:)
   REAL(KIND=real_jlslsm), POINTER :: canopy_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: cs_pool_soilt(:,:,:,:)
+  REAL(KIND=real_jlslsm), POINTER :: pyc_inert_c_pool_gb(:,:)
   REAL(KIND=real_jlslsm), POINTER :: frac_c_label_pool_soilt(:,:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: di_ncat_sicat(:,:,:)
   REAL(KIND=real_jlslsm), POINTER :: k_sice_sicat(:,:,:)
@@ -313,11 +316,13 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 ALLOCATE(progs_data%nsnow_surft(land_pts,nsurft))
 ALLOCATE(progs_data%rho_snow_grnd_surft(land_pts,nsurft))
 ALLOCATE(progs_data%snowdepth_surft(land_pts,nsurft))
+ALLOCATE(progs_data%pyc_inert_c_pool_gb(land_pts,dim_cslayer))
 ALLOCATE(progs_data%cs_pool_soilt(land_pts,nsoilt,dim_cslayer,dim_cs1))
 progs_data%nsnow_surft(:,:)         = 0
 progs_data%rho_snow_grnd_surft(:,:) = 0.0
 progs_data%snowdepth_surft(:,:)     = 0.0
 progs_data%cs_pool_soilt(:,:,:,:)   = 0.0
+progs_data%pyc_inert_c_pool_gb(:,:)   = 0.0
 
 ! Additional soil carbon variables
 IF (l_layeredc .OR. soil_bgc_model == soil_model_ecosse) THEN
@@ -530,6 +535,7 @@ DEALLOCATE(progs_data%nsnow_surft)
 DEALLOCATE(progs_data%rho_snow_grnd_surft)
 DEALLOCATE(progs_data%snowdepth_surft)
 DEALLOCATE(progs_data%cs_pool_soilt)
+DEALLOCATE(progs_data%pyc_inert_c_pool_gb)
 DEALLOCATE(progs_data%t_soil_soilt_acc)
 DEALLOCATE(progs_data%ns_pool_gb)
 DEALLOCATE(progs_data%n_inorg_gb)
@@ -638,6 +644,7 @@ progs%nsnow_surft => progs_data%nsnow_surft
 progs%rho_snow_grnd_surft => progs_data%rho_snow_grnd_surft
 progs%snowdepth_surft => progs_data%snowdepth_surft
 progs%cs_pool_soilt => progs_data%cs_pool_soilt
+progs%pyc_inert_c_pool_gb => progs_data%pyc_inert_c_pool_gb
 progs%frac_c_label_pool_soilt => progs_data%frac_c_label_pool_soilt
 progs%t_soil_soilt_acc => progs_data%t_soil_soilt_acc
 progs%ns_pool_gb => progs_data%ns_pool_gb
@@ -728,6 +735,7 @@ NULLIFY(progs%nsnow_surft)
 NULLIFY(progs%rho_snow_grnd_surft)
 NULLIFY(progs%snowdepth_surft)
 NULLIFY(progs%cs_pool_soilt)
+NULLIFY(progs%pyc_inert_c_pool_gb)
 NULLIFY(progs%frac_c_label_pool_soilt)
 NULLIFY(progs%t_soil_soilt_acc)
 NULLIFY(progs%ns_pool_gb)

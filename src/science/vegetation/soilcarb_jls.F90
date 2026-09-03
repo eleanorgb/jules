@@ -32,20 +32,23 @@ SUBROUTINE soilcarb (land_pts, trif_pts, trif_index,                           &
                     ns_pool_gb, n_inorg_soilt_lyrs,                            &
                     !trif_vars_mod
                     burnt_carbon_dpm, g_burn_gb, burnt_carbon_rpm,             &
+                    lit_c_fire_pft, lit_c_fire_gb, pyc_inert_c_pool_gb,        &
+                    lit_c_fire_to_pyc_gb,                                      &
                     minl_n_gb, minl_n_pot_gb, immob_n_gb, immob_n_pot_gb,      &
                     fn_gb, resp_s_diag_gb, resp_s_pot_diag_gb,                 &
-                    dpm_ratio_gb, n_gas_gb, resp_s_to_atmos_gb,                &
+                    dpm_ratio_gb, n_gas_gb, resp_s_to_atmos_gb, resp_pyc_gb,   &
                     !p_s_parms
-                    sthu_soilt)
+                    sthu_soilt,                                                &
+                    prop_burnt_veg_to_inert)
 
 USE jules_surface_types_mod, ONLY: npft
 USE jules_soil_biogeochem_mod, ONLY: bio_hum_CN
+USE trif, ONLY: burnt_veg_to_inert_frac, burnt_veg_to_rpm_frac, tau_pyc
 
-USE jules_vegetation_mod, ONLY: l_nitrogen
+USE jules_vegetation_mod, ONLY: l_nitrogen, l_trif_fire, l_soil_pyc, l_use_flammability
 
 USE jules_soil_mod, ONLY: cs_min, sm_levels
 USE ancil_info, ONLY: dim_cslayer, nsoilt, dim_cs1
-USE jules_vegetation_mod, ONLY: l_trif_fire !usage inside ifdef
 
 USE dpm_rpm_mod, ONLY: dpm_rpm
 USE decay_mod, ONLY: decay
@@ -81,10 +84,20 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Total carbon litter (kg C/m2/360days).
   lit_n_t(land_pts),                                                           &
     ! Total nitrogen litter (kg N/m2/360days).
-  resp_frac(land_pts)
+  lit_c_fire_pft(land_pts,npft),                                               &
+    ! Fire carbon litter per pft (kg C/m2/360days).
+  resp_frac(land_pts),                                                         &
     ! The fraction of RESP_S (soil respiration) that forms new soil C.
     ! This is the fraction that is NOT released to the atmosphere.
+  prop_burnt_veg_to_inert(land_pts,npft)
+    ! if l_use_flammability then proportion of burnt vegetation 
+    ! that goes to pyc
 
+REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
+  lit_c_fire_gb(land_pts),                                                     &
+    ! Total fire veg carbon litter into soil (kg C/m2/360days).
+  lit_c_fire_to_pyc_gb(land_pts)
+    ! Fire veg carbon litter into pyc (kg C/m2/360days).
 !-----------------------------------------------------------------------------
 ! Arguments with INTENT(INOUT).
 !-----------------------------------------------------------------------------
@@ -128,13 +141,24 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) :: resp_s_pot_diag_gb(land_pts,dim_cslaye
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: dpm_ratio_gb(land_pts)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: n_gas_gb(land_pts,dim_cslayer)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: resp_s_to_atmos_gb(land_pts,dim_cslayer)
-
+REAL(KIND=real_jlslsm), INTENT(IN OUT) :: pyc_inert_c_pool_gb(land_pts,dim_cslayer)
+    ! Inert soil carbon due to pyc (kg C / m2)
+REAL(KIND=real_jlslsm), INTENT(IN OUT) :: resp_pyc_gb(land_pts,dim_cslayer)
+    ! respiration from pyc
 !p_s_parms
 REAL(KIND=real_jlslsm), INTENT(IN) :: sthu_soilt(land_pts,nsoilt,sm_levels)
 
 !-----------------------------------------------------------------------------
 ! Local scalar parameters.
 !-----------------------------------------------------------------------------
+
+REAL(KIND=real_jlslsm) :: lit_c_fire_to_rpm_gb(land_pts)
+REAL(KIND=real_jlslsm) :: lit_c_fire_to_hum_gb(land_pts)
+REAL(KIND=real_jlslsm) :: lit_c_fire_to_4pools(land_pts)
+REAL(KIND=real_jlslsm) :: lit_c_nofire(land_pts,npft)
+REAL(KIND=real_jlslsm) :: pyc_inert_flux_gb(land_pts)
+REAL(KIND=real_jlslsm) :: dpyc(land_pts)
+
 REAL(KIND=real_jlslsm), PARAMETER :: lit_cn    = 300.0
 REAL(KIND=real_jlslsm), PARAMETER :: nminl_gas = 0.01
 REAL(KIND=real_jlslsm), PARAMETER ::                                           &
@@ -151,7 +175,7 @@ REAL(KIND=real_jlslsm), PARAMETER ::                                           &
 ! Local variables.
 !-----------------------------------------------------------------------------
 INTEGER ::                                                                     &
-  l,t
+  l, n, t
     ! Loop counters
 
 REAL(KIND=real_jlslsm) ::                                                      &
@@ -202,6 +226,8 @@ IF (lhook) CALL dr_hook(ModuleName//':'//RoutineName,zhook_in,zhook_handle)
 burnt_soil(:)     = 0.0
 fn_gb(:,:)        = 1.0
 n_gas_gb(:,:)     = 0.0
+dpyc(:)           = 0.0
+pyc_inert_flux_gb(:) = 0.0
 ! Precalculate constants.
 cs_min_lit_cn     = cs_min / lit_cn
 cs_min_bio_hum_cn = cs_min / bio_hum_cn
@@ -295,8 +321,44 @@ DO t = 1,trif_pts
 
 END DO
 
+IF ( l_soil_pyc ) THEN
+  DO t = 1,trif_pts
+    l = trif_index(t)
+    lit_c_fire_to_rpm_gb(l) = 0.0
+    lit_c_fire_to_hum_gb(l) = 0.0
+    lit_c_fire_to_pyc_gb(l) = 0.0
+    lit_c_fire_gb(l) = 0.0
+    DO n = 1,npft
+      IF (l_use_flammability) THEN
+        lit_c_fire_to_rpm_gb(l) =  lit_c_fire_pft(l,n) *                      &
+                                     ( 1.0 - prop_burnt_veg_to_inert(l,n)) 
+        lit_c_fire_to_hum_gb(l)  = 0.0
+      ELSE ! use predefined proportions from namelists
+        ! fire componenet of litter that is entering the soil
+        ! e.g. 10,40,50 to rpm, hum, inert respectively.
+        ! not explicitly needed but included n dimension
+        lit_c_fire_to_4pools(l) =  lit_c_fire_pft(l,n) *                       &
+                                     ( 1.0 - burnt_veg_to_inert_frac(n))
+        lit_c_fire_to_rpm_gb(l) = lit_c_fire_to_rpm_gb(l) +                    &
+                    lit_c_fire_to_4pools(l) * burnt_veg_to_rpm_frac(n)
+        lit_c_fire_to_hum_gb(l) = lit_c_fire_to_hum_gb(l) +                    &
+               lit_c_fire_to_4pools(l) * (1.0 - burnt_veg_to_rpm_frac(n))
+      END IF
+      lit_c_fire_gb(l) = lit_c_fire_pft(l,n)  + lit_c_fire_gb(l)
+      IF (l_use_flammability) THEN
+        lit_c_fire_to_pyc_gb(l) = lit_c_fire_pft(l,n) *                          &
+               prop_burnt_veg_to_inert(l,n) + lit_c_fire_to_pyc_gb(l)
+      ELSE
+        lit_c_fire_to_pyc_gb(l) = lit_c_fire_pft(l,n) *                          &
+               burnt_veg_to_inert_frac(n) + lit_c_fire_to_pyc_gb(l)
+      END IF
+      lit_c_nofire(l,n) = lit_c(l,n) - lit_c_fire_pft(l,n)
+    END DO
+  END DO
+END IF
+
 ! calculate DPM:RPM ratio of input litter Carbon
-CALL dpm_rpm(land_pts, trif_pts, trif_index, lit_c, dpm_ratio_gb)
+CALL dpm_rpm(land_pts, trif_pts, trif_index, lit_c_nofire, dpm_ratio_gb)
 
 DO t = 1,trif_pts
   l = trif_index(t)
@@ -379,10 +441,23 @@ DO t = 1,trif_pts
   !---------------------------------------------------------------------------
   ! Diagnose the net local carbon flux into the soil
   !---------------------------------------------------------------------------
-  pc(l,1) = dpm_ratio_gb(l) * lit_c_t(l) - resp_s(l,1,1)
-  pc(l,2) = (1.0 - dpm_ratio_gb(l)) * lit_c_t(l) - resp_s(l,1,2)
+  IF ( l_soil_pyc ) THEN  ! dont really need this switch as long as all zeros
+    ! remove fire litter c from input
+    pc(l,1) = dpm_ratio_gb(l) * (lit_c_t(l) - lit_c_fire_gb(l)) - resp_s(l,1,1)
+
+    ! remove fire litter c from input but add propotion of burnt veg c from above
+    pc(l,2) = (1.0 - dpm_ratio_gb(l)) * (lit_c_t(l) - lit_c_fire_gb(l)) - &
+                resp_s(l,1,2) + lit_c_fire_to_rpm_gb(l)
+  ELSE
+    pc(l,1) = dpm_ratio_gb(l) * lit_c_t(l) - resp_s(l,1,1)
+    pc(l,2) = (1.0 - dpm_ratio_gb(l)) * lit_c_t(l) - resp_s(l,1,2)
+  ENDIF
   pc(l,3) = resp_frac_mult46(l) * resp_s(l,1,5) - resp_s(l,1,3)
   pc(l,4) = resp_frac_mult54(l) * resp_s(l,1,5) - resp_s(l,1,4)
+  IF ( l_soil_pyc ) THEN  ! dont really need this switch as long as all zeros
+    ! hum pool is like rpm
+    pc(l,4) = pc(l,4) + lit_c_fire_to_hum_gb(l)
+  END IF
 
   !---------------------------------------------------------------------------
   ! Variables required for the implicit and equilibrium calculations
@@ -407,6 +482,20 @@ END DO
 !-----------------------------------------------------------------------------
 CALL decay (land_pts, trif_pts, trif_index, forw, r_gamma, dpc_dcs, pc,        &
             cs(:,1,:))
+
+!-----------------------------------------------------------------------------
+! Update pyc soil carbon
+!-----------------------------------------------------------------------------
+DO t = 1,trif_pts
+  l = trif_index(t)
+  ! decomposition of pyc_inert_c_pool_gb - flux out of pool per day
+  resp_pyc_gb(l,1) = pyc_inert_c_pool_gb(l,1) * EXP( -1.0 * tau_pyc ) * r_gamma
+
+  pyc_inert_c_pool_gb(l,1) = pyc_inert_c_pool_gb(l,1) +                        &
+        lit_c_fire_to_pyc_gb(l) / r_gamma -  resp_pyc_gb(l,1)/ r_gamma
+   ! maybe need something to make sure pool cant go below zero
+   ! but I dont think it can Maybein initialisation)
+END DO
 
 !-----------------------------------------------------------------------------
 ! Apply implicit correction to the soil respiration rate.

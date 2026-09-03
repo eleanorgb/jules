@@ -22,7 +22,7 @@ SUBROUTINE veg2(                                                               &
                asteps_since_triffid,                                           &
                g_leaf_ac, g_leaf_phen_ac, npp_ac,                              &
                resp_s_acc, resp_w_ac,                                          &
-               cs, frac_c_label_pool, frac, lai, ht,                           &
+               cs, pyc_inert_c_pool_gb, frac_c_label_pool, frac, lai, ht,      &
                catch_s, catch_t, infil_t, z0_t, z0h_t, c_veg, cv,              &
                g_leaf_day, g_leaf_phen, g_leaf_dr_out,                         &
                lai_phen, lit_c, lit_c_mn, npp_dr_out,                          &
@@ -176,6 +176,8 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
     ! Accumulated wood respiration (kg C/m2).
   cs(land_pts,dim_cslayer,4),                                                  &
     ! Soil carbon content (kg m-2).
+  pyc_inert_c_pool_gb(land_pts,dim_cslayer),                                   &
+    ! inert pyc pool
   frac_c_label_pool(land_pts,dim_cslayer,dim_cs1),                             &
     ! fraction of soil carbon that is labelled and traced
   frac(land_pts,ntype),                                                        &
@@ -724,7 +726,8 @@ IF (l_triffid .AND.                                                            &
                   trif_vars%root_abandon_n_pft, trif_vars%npp_n_gb,            &
                   trif_vars%npp_n, trif_vars%lit_c_fire_pft,                   &
                   trif_vars%lit_c_nofire_pft, trif_vars%lit_n_fire_pft,        &
-                  trif_vars%lit_n_nofire_pft,                                  &
+                  trif_vars%lit_c_fire_gb, trif_vars%lit_c_fire_to_pyc_gb,     &
+                  pyc_inert_c_pool_gb,trif_vars%lit_n_nofire_pft,              &
                   trif_vars%veg_c_fire_emission_gb,                            &
                   trif_vars%veg_c_fire_emission_pft,                           &
                   trif_vars%n_leaf_trif_pft, trif_vars%n_leaf_alloc_trif_pft,  &
@@ -746,7 +749,7 @@ IF (l_triffid .AND.                                                            &
                   trif_vars%minl_n_pot_gb, trif_vars%immob_n_pot_gb,           &
                   trif_vars%fn_gb, trif_vars%resp_s_diag_gb,                   &
                   trif_vars%resp_s_pot_diag_gb, trif_vars%dpm_ratio_gb,        &
-                  trif_vars%resp_s_to_atmos_gb,                                &
+                  trif_vars%resp_s_to_atmos_gb, trif_vars%resp_pyc_gb,         &
                   trif_vars%deposition_n_gb, dvi_cpft,                         &
                   !p_s_parms
                   sthu_soilt,                                                  &

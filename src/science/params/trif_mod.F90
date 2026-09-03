@@ -37,7 +37,19 @@ ag_expand(:)
                  ! 0 = no (default) , 1 = yes . Used only if l_ag_expand=T
 
 REAL(KIND=real_jlslsm), ALLOCATABLE ::                                         &
- g_area(:)                                                                     &
+burnt_veg_to_atmos_frac(:)                                                     &
+                  ! Fraction of burnt veg carbon that goes to the atmosphere as CO2 instead
+                  ! of in the soil.
+,burnt_veg_to_inert_frac(:)                                                    &
+                  ! if l_pyc 
+                  ! proportion of the burnt veg carbon that goes to the soil
+                  ! goes to the inert pool 
+,burnt_veg_to_rpm_frac(:)                                                      &
+                  ! if l_pyc
+                  ! proportion of the burnt veg carbon that goes to the soil
+                  ! that goes to the rpm pool (rest goes to the hum pool)
+                  ! veg C to soil goes to inert, rpm, hum - assign proportions
+,g_area(:)                                                                     &
                   !  Disturbance rate (/360days).
 ,g_grow(:)                                                                     &
                   !  Rate of leaf growth (/360days)
@@ -68,6 +80,9 @@ REAL(KIND=real_jlslsm), ALLOCATABLE ::                                         &
                   ! Root N retranslocation factor
 ,harvest_ht(:)
                   ! Height to which harvested biocrops are cut (m)
+
+REAL(KIND=real_jlslsm) :: tau_pyc
+                  ! decay constant of pyc soil carbon
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='TRIF'
 
@@ -104,6 +119,7 @@ IF ( l_triffid .OR. l_phenol ) THEN
   ALLOCATE( harvest_freq(npft))
   ALLOCATE( harvest_type(npft))
   ALLOCATE( ag_expand(npft))
+  ALLOCATE( burnt_veg_to_atmos_frac(npft))
   ALLOCATE( g_area(npft))
   ALLOCATE( g_grow(npft))
   ALLOCATE( g_root(npft))
@@ -114,6 +130,8 @@ IF ( l_triffid .OR. l_phenol ) THEN
   ALLOCATE( alloc_med(npft))
   ALLOCATE( alloc_slow(npft))
   ALLOCATE( dpm_rpm_ratio(npft))
+  ALLOCATE( burnt_veg_to_inert_frac(npft))
+  ALLOCATE( burnt_veg_to_rpm_frac(npft))
   ALLOCATE( retran_r(npft))
   ALLOCATE( retran_l(npft))
   ALLOCATE( harvest_ht(npft))
@@ -121,6 +139,7 @@ IF ( l_triffid .OR. l_phenol ) THEN
   harvest_freq(:)  = 0
   harvest_type(:)  = 0
   ag_expand(:)     = 0
+  burnt_veg_to_atmos_frac(:)    = 0.0
   g_area(:)        = 0.0
   g_grow(:)        = 0.0
   g_root(:)        = 0.0
@@ -131,6 +150,9 @@ IF ( l_triffid .OR. l_phenol ) THEN
   alloc_med(:)     = 0.0
   alloc_slow(:)    = 0.0
   dpm_rpm_ratio(:) = 0.0
+  burnt_veg_to_inert_frac(:) = 0.0
+  burnt_veg_to_rpm_frac(:) = 0.0
+  tau_pyc = 0.0
   retran_r(:)      = 0.0
   retran_l(:)      = 0.0
   harvest_ht(:)    = 0.0

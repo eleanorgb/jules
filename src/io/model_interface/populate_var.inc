@@ -1474,6 +1474,14 @@ CASE ( 'canopy' )
     progs%canopy_surft(:,:) = const_val
   END IF
 
+CASE ( 'inert_pyc' )
+  IF ( PRESENT(cube) ) THEN
+    cube_land = map_to_land(cube)
+    CALL cube_get_data(cube_land, progs%pyc_inert_c_pool_gb)
+  ELSE
+    progs%pyc_inert_c_pool_gb(:,:) = const_val
+  END IF
+
 CASE ( 'cs' )
   IF ( PRESENT(cube) ) THEN
     IF ( l_tile_soil .AND. l_broadcast_soilt) THEN

@@ -76,6 +76,7 @@ SUBROUTINE triffid (land_pts, trif_pts, trif_index, forw, r_gamma,             &
                     n_fertiliser_pft, n_fertiliser_gb, n_fertiliser_add,       &
                     root_abandon_n_pft, npp_n_gb, npp_n,                       &
                     lit_c_fire_pft, lit_c_nofire_pft, lit_n_fire_pft,          &
+                    lit_c_fire_gb, lit_c_fire_to_pyc_gb, pyc_inert_c_pool_gb,  &
                     lit_n_nofire_pft, veg_c_fire_emission_gb,                  &
                     veg_c_fire_emission_pft,                                   &
                     n_leaf_trif_pft, n_leaf_alloc_trif_pft,                    &
@@ -92,7 +93,7 @@ SUBROUTINE triffid (land_pts, trif_pts, trif_index, forw, r_gamma,             &
                     burnt_carbon_dpm, burnt_carbon_rpm, minl_n_pot_gb,         &
                     immob_n_pot_gb, fn_gb, resp_s_diag_gb,                     &
                     resp_s_pot_diag_gb, dpm_ratio_gb, resp_s_to_atmos_gb,      &
-                    deposition_n_gb,  dvi_cpft,                                &
+                    resp_pyc_gb, deposition_n_gb,  dvi_cpft,                   &
                     !p_s_parms
                     sthu_soilt,                                                &
                     ! soil_ecosse_vars_mod
@@ -128,9 +129,12 @@ USE jules_soil_mod, ONLY: sm_levels
 
 USE jules_surface_mod, ONLY: cmass
 
+USE jules_fields_mod, ONLY: fire_vars
+
 USE pftparm, ONLY: a_wl, a_ws, b_wl, eta_sl, lma, sigl
 
-USE trif, ONLY: crop, harvest_freq, harvest_ht, harvest_type, lai_min
+USE trif, ONLY: crop, harvest_freq, harvest_ht, harvest_type, lai_min,         &
+                burnt_veg_to_atmos_frac
 
 USE jules_soil_biogeochem_mod, ONLY:                                           &
   ! imported scalar parameters
@@ -142,7 +146,9 @@ USE jules_vegetation_mod, ONLY: l_veg_compete, l_ht_compete,                   &
                                 l_trait_phys, l_trif_eq, l_landuse,            &
                                 can_rad_mod, l_nitrogen,                       &
                                 l_trif_crop, frac_min, triffid_period,         &
-                                l_trif_biocrop
+                                l_trif_biocrop, l_soil_pyc, l_use_flammability
+
+USE logging_mod, ONLY: log_fatal
 
 USE parkind1, ONLY: jprb, jpim
 
@@ -178,11 +184,13 @@ REAL(KIND=real_jlslsm), INTENT(IN) ::                                          &
     ! Fraction of pasture.
   frac_biocrop(land_pts),                                                      &
     ! Fraction of bioenergy crops.
-  resp_frac(land_pts,dim_cslayer),                                             &
-    ! The fraction of RESP_S (soil respiration) that forms new soil C.
-    ! This is the fraction that is NOT released to the atmosphere.
   dvi_cpft(:,:)
     !  Development index for crop tiles
+
+REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                          &
+  resp_frac(land_pts,dim_cslayer)
+    ! The fraction of RESP_S (soil respiration) that forms new soil C.
+    ! This is the fraction that is NOT released to the atmosphere.
 
 !-----------------------------------------------------------------------------
 ! Arguments with INTENT(INOUT).
@@ -344,6 +352,8 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) :: lit_n_fire_pft(land_pts,npft)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: lit_n_nofire_pft(land_pts,npft)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: veg_c_fire_emission_gb(land_pts)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: veg_c_fire_emission_pft(land_pts,npft)
+REAL(KIND=real_jlslsm), INTENT(IN OUT) :: lit_c_fire_gb(land_pts)
+REAL(KIND=real_jlslsm), INTENT(IN OUT) :: lit_c_fire_to_pyc_gb(land_pts)
 REAL(KIND=real_jlslsm), INTENT(OUT) :: n_leaf_trif_pft(land_pts,npft)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: n_leaf_alloc_trif_pft(land_pts,npft)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: n_leaf_labile_trif_pft(land_pts,npft)
@@ -378,8 +388,11 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
           resp_s_pot_diag_gb(land_pts,dim_cslayer,dim_cs1+1)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) :: dpm_ratio_gb(land_pts)
+REAL(KIND=real_jlslsm), INTENT(IN OUT) :: pyc_inert_c_pool_gb(land_pts)
 REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
           resp_s_to_atmos_gb(land_pts,dim_cslayer)
+REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
+          resp_pyc_gb(land_pts,dim_cslayer)
 REAL(KIND=real_jlslsm), INTENT(IN) :: deposition_n_gb(land_pts)
 
 !p_s_parms
@@ -403,11 +416,6 @@ INTEGER, PARAMETER :: veg_types = 4
 REAL(KIND=real_jlslsm), PARAMETER :: harvest_rate = 0.3
     ! Fraction of litter diverted as harvest.
     ! This fraction ends up in the product pools instead of in the soil.
-
-REAL(KIND=real_jlslsm), PARAMETER :: fire_ratio = 0.13
-    ! Fraction of burnt carbon that goes to the atmosphere as CO2 instead
-    ! of in the soil. Based on mean whole-plant mortality factor from
-    ! Li et al (2012) table 2.
 
 !-----------------------------------------------------------------------------
 ! Local scalar variables.
@@ -454,6 +462,10 @@ LOGICAL :: have_layers
 ! Local array variables.
 !-----------------------------------------------------------------------------
 REAL(KIND=real_jlslsm) ::                                                      &
+  prop_burnt_veg_to_atmos(land_pts,npft),                                      &
+    ! if l_use_flammability then calculate this as a function of flammability
+  prop_burnt_veg_to_inert(land_pts,npft),                                      &
+    ! if l_use_flammability then calculate this as a function of flammability
   dfrac(land_pts,npft),                                                        &
     ! Change in areal fraction during the timestep.
   dfrac_na(land_pts,npft),                                                     &
@@ -577,7 +589,8 @@ litterN_pft(:,:)  = 0.0
 npp_n(:,:)        = 0.0
 npp_n_gb(:)       = 0.0
 harvest_switch(:,:) = .FALSE.
-
+prop_burnt_veg_to_atmos(:,:) = 0.13
+prop_burnt_veg_to_inert(:,:) = 0.0
 !-----------------------------------------------------------------------------
 ! Diagnose the C and N stored in each component of the vegetation, and the
 ! phenological state.
@@ -1061,6 +1074,8 @@ DO t = 1,trif_pts
   harvest_biocrop_gb(l)     = 0.0
   harvest_biocrop_n_gb(l)   = 0.0
   veg_c_fire_emission_gb(l) = 0.0
+  lit_c_fire_gb(l)          = 0.0
+  lit_c_fire_to_pyc_gb(l)  = 0.0
   root_abandon_gb(l)        = 0.0
   root_abandon_n_gb(l)      = 0.0
   n_LUC(l)                  = 0.0
@@ -1151,6 +1166,7 @@ DO t = 1,trif_pts
     ! Litter carbon from fire = (total litter with fire) -
     !                           (total litter without fire)
     lit_c_fire_pft(l,n) = lit_c_orig_pft(l,n) - lit_c_nofire_pft(l,n)
+    ! above is the total vegetation carbon burnt per pft
 
     ! LITTER NITROGEN
     ! Litter nitrogen with land use change, without fire
@@ -1169,11 +1185,36 @@ DO t = 1,trif_pts
       lit_n_fire_pft(l,n) = 0.0
     END IF
 
-    veg_c_fire_emission_pft(l,n) = lit_c_fire_pft(l,n) * fire_ratio
+    IF (l_use_flammability) THEN
+      ! eleanor
+      ! Atmos  = np.exp(-((F - 100) ** 2) / (4 * 35**2))
+      prop_burnt_veg_to_atmos(l,n) =                                   &
+          EXP(-1.0 * ((100 * fire_vars%flammability_ft(l,n) - 100.0) ** 2.)) / 4900.
+
+      ! PyC    = (1.0 * np.exp(-((F - 70) ** 2) / (2 * 20**2)))
+      prop_burnt_veg_to_inert(l,n) =   &
+         EXP(-1.0 * ((100 * fire_vars%flammability_ft(l,n) - 70.) ** 2.)) / 800.
+      print*,fire_vars%flammability_ft(l,n)
+      print*,"proportions", prop_burnt_veg_to_atmos(l,n),prop_burnt_veg_to_inert(l,n)
+! probably need to check that not greater than 1
+      veg_c_fire_emission_pft(l,n) = lit_c_fire_pft(l,n) * prop_burnt_veg_to_atmos(l,n)
+      ! eleanor
+    ELSE
+      ! veg carbon burnt emitted to atmosphere per pft
+      veg_c_fire_emission_pft(l,n) = lit_c_fire_pft(l,n) * burnt_veg_to_atmos_frac(n)
+      ! (1 - burnt_veg_to_atmos_frac) goes to the soil
+    END IF
+
+    ! veg carbon burnt to soil per pft
+    ! separate out the fire litter form the normal litter
+    lit_c_fire_pft(l,n) = lit_c_fire_pft(l,n) - veg_c_fire_emission_pft(l,n)
 
     veg_c_fire_emission_gb(l) = veg_c_fire_emission_gb(l) +                    &
                                 veg_c_fire_emission_pft(l,n)
+    ! fire plus non fire litter is lit_c - not sure about this
     lit_c(l,n) = lit_c(l,n) - veg_c_fire_emission_pft(l,n)
+    !  total veg carbon burnt that goes to the soil
+    !lit_c_fire_gb(l) = lit_c_fire_gb(l) + lit_c_fire_pft(l,n)
 
     !-------------------------------------------------------------------------
     ! Harvest crop carbon
@@ -1219,7 +1260,7 @@ DO t = 1,trif_pts
 
       ! If l_trif_biocrop=F but l_trif_crop=T, harvest as per harvest_type=1
     ELSE IF ( l_trif_crop ) THEN
-      IF ( (crop(n) == 1.0) .AND. (lit_c(l,n) > 0.0) .AND.                     &
+      IF ( (crop(n) == 1) .AND. (lit_c(l,n) > 0.0) .AND.                     &
            (lit_n_pft(l,n) > 0.0) ) THEN
         harvest_pft(l,n)   = harvest_rate * lit_c(l,n)
         lit_c(l,n)         = lit_c(l,n) - harvest_pft(l,n)
@@ -1320,13 +1361,17 @@ IF ( soil_bgc_model == soil_model_4pool ) THEN
                   ns_pool_gb, n_inorg_soilt_lyrs,                              &
                   !trif_vars_mod
                   burnt_carbon_dpm, g_burn_gb, burnt_carbon_rpm,               &
+                  lit_c_fire_pft, lit_c_fire_gb, pyc_inert_c_pool_gb,          &
+                    lit_c_fire_to_pyc_gb,                                      &
                   minl_n_gb, minl_n_pot_gb, immob_n_gb, immob_n_pot_gb,        &
                   fn_gb, resp_s_diag_gb, resp_s_pot_diag_gb,                   &
-                  dpm_ratio_gb, n_gas_gb, resp_s_to_atmos_gb,                  &
+                  dpm_ratio_gb, n_gas_gb, resp_s_to_atmos_gb, resp_pyc_gb,     &
                   !p_s_parms
-                  sthu_soilt)
+                  sthu_soilt,                                                  &
+                  prop_burnt_veg_to_inert)
   ELSE
-    CALL soilcarb_layers (land_pts, trif_pts, trif_index, forw, r_gamma,       &
+    IF ( .NOT. l_soil_pyc ) THEN
+      CALL soilcarb_layers (land_pts, trif_pts, trif_index, forw, r_gamma,     &
                           lit_c, lit_c_t, lit_n_t_gb, resp_frac_cspool,        &
                           resp_s, cs, frac_c_label_pool,                       &
                           ns_gb, neg_n, implicit_resp_correction,              &
@@ -1342,6 +1387,10 @@ IF ( soil_bgc_model == soil_model_4pool ) THEN
                          dpm_ratio_gb, n_gas_gb, resp_s_to_atmos_gb,           &
                          !p_s_parms
                          sthu_soilt)
+    ELSE
+       CALL log_fatal(RoutineName,                                             &
+                 "Currently cant have l_layeredc=TRUE with l_pyc=TRUE " )
+    END IF
   END IF
 
   !---------------------------------------------------------------------------
@@ -1444,7 +1493,7 @@ END DO
 ! Update the Wood Product Pools
 !-----------------------------------------------------------------------------
 
-IF (forw == 0.0) THEN
+IF (int(forw) == 0) THEN
   CALL woodprod ( land_pts, trif_pts, trif_index,                              &
                   r_gamma,                                                     &
                   lit_c_ag_pft,                                                &

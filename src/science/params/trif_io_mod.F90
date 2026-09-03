@@ -33,6 +33,7 @@ INTEGER ::                                                                     &
   ag_expand_io(npft_max) = imdi
 
 REAL(KIND=real_jlslsm) ::                                                      &
+  burnt_veg_to_atmos_frac_io(npft_max) = rmdi,                                 &
   g_area_io(npft_max) = rmdi,                                                  &
   g_grow_io(npft_max) = rmdi,                                                  &
   g_root_io(npft_max) = rmdi,                                                  &
@@ -43,6 +44,9 @@ REAL(KIND=real_jlslsm) ::                                                      &
   alloc_med_io(npft_max) = rmdi,                                               &
   alloc_slow_io(npft_max) = rmdi,                                              &
   dpm_rpm_ratio_io(npft_max) = rmdi,                                           &
+  burnt_veg_to_inert_frac_io(npft_max) = rmdi,                                 &
+  burnt_veg_to_rpm_frac_io(npft_max) = rmdi,                                   &
+  tau_pyc_io = rmdi,                                                           &
   retran_l_io(npft_max) = rmdi,                                                &
   retran_r_io(npft_max) = rmdi,                                                &
   harvest_ht_io(npft_max) = rmdi
@@ -55,7 +59,9 @@ NAMELIST  / jules_triffid/ crop_io, harvest_freq_io, harvest_type_io,          &
                          g_wood_io,lai_max_io,lai_min_io,                      &
                          alloc_fast_io,alloc_med_io,alloc_slow_io,             &
                          dpm_rpm_ratio_io,retran_l_io,retran_r_io,             &
-                         harvest_ht_io
+                         harvest_ht_io, burnt_veg_to_inert_frac_io,            &
+                         burnt_veg_to_rpm_frac_io, burnt_veg_to_atmos_frac_io, &
+                         tau_pyc_io
 
 CHARACTER(LEN=*), PARAMETER, PRIVATE :: ModuleName='TRIF_IO'
 
@@ -71,6 +77,8 @@ CALL jules_print('trif_io',                                                    &
 WRITE(lineBuffer,*)' crop_io = ',crop_io
 CALL jules_print('trif_io',lineBuffer)
 WRITE(lineBuffer,*)' g_area_io = ',g_area_io
+CALL jules_print('trif_io',lineBuffer)
+WRITE(lineBuffer,*)' burnt_veg_to_atmos_frac_io = ',burnt_veg_to_atmos_frac_io
 CALL jules_print('trif_io',lineBuffer)
 WRITE(lineBuffer,*)' g_grow_io = ',g_grow_io
 CALL jules_print('trif_io',lineBuffer)
@@ -89,6 +97,12 @@ CALL jules_print('trif_io',lineBuffer)
 WRITE(lineBuffer,*)' alloc_slow_io = ',alloc_slow_io
 CALL jules_print('trif_io',lineBuffer)
 WRITE(lineBuffer,*)' dpm_rpm_ratio_io = ',dpm_rpm_ratio_io
+CALL jules_print('trif_io',lineBuffer)
+WRITE(lineBuffer,*)' burnt_veg_to_inert_frac_io = ',burnt_veg_to_inert_frac_io
+CALL jules_print('trif_io',lineBuffer)
+WRITE(lineBuffer,*)' burnt_veg_to_rpm_frac_io = ',burnt_veg_to_rpm_frac_io
+CALL jules_print('trif_io',lineBuffer)
+WRITE(lineBuffer,*)' tau_pyc_io = ',tau_pyc_io
 CALL jules_print('trif_io',lineBuffer)
 WRITE(lineBuffer,*)' retran_r_io = ',retran_r_io
 CALL jules_print('trif_io',lineBuffer)
@@ -140,7 +154,7 @@ CHARACTER(LEN=errormessagelength) :: iomessage
 ! set number of each type of variable in my_namelist type
 INTEGER, PARAMETER :: no_of_types = 2
 INTEGER, PARAMETER :: n_int = 4 * npft_max
-INTEGER, PARAMETER :: n_real = 13 * npft_max
+INTEGER, PARAMETER :: n_real = 17 * npft_max
 
 TYPE :: my_namelist
   SEQUENCE
@@ -150,6 +164,7 @@ TYPE :: my_namelist
   INTEGER :: ag_expand_io(npft_max)
   REAL(KIND=real_jlslsm) :: harvest_ht_io(npft_max)
   REAL(KIND=real_jlslsm) :: g_area_io(npft_max)
+  REAL(KIND=real_jlslsm) :: burnt_veg_to_atmos_frac_io(npft_max)
   REAL(KIND=real_jlslsm) :: g_grow_io(npft_max)
   REAL(KIND=real_jlslsm) :: g_root_io(npft_max)
   REAL(KIND=real_jlslsm) :: g_wood_io(npft_max)
@@ -159,6 +174,9 @@ TYPE :: my_namelist
   REAL(KIND=real_jlslsm) :: alloc_med_io(npft_max)
   REAL(KIND=real_jlslsm) :: alloc_slow_io(npft_max)
   REAL(KIND=real_jlslsm) :: dpm_rpm_ratio_io(npft_max)
+  REAL(KIND=real_jlslsm) :: burnt_veg_to_inert_frac_io(npft_max)
+  REAL(KIND=real_jlslsm) :: burnt_veg_to_rpm_frac_io(npft_max)
+  REAL(KIND=real_jlslsm) :: tau_pyc_io
   REAL(KIND=real_jlslsm) :: retran_l_io(npft_max)
   REAL(KIND=real_jlslsm) :: retran_r_io(npft_max)
 END TYPE my_namelist
@@ -183,6 +201,7 @@ IF (mype == 0) THEN
   my_nml % harvest_type_io = harvest_type_io
   my_nml % ag_expand_io = ag_expand_io
   my_nml % harvest_ht_io = harvest_ht_io
+  my_nml % burnt_veg_to_atmos_frac_io  = burnt_veg_to_atmos_frac_io
   my_nml % g_area_io  = g_area_io
   my_nml % g_grow_io  = g_grow_io
   my_nml % g_root_io  = g_root_io
@@ -193,6 +212,9 @@ IF (mype == 0) THEN
   my_nml % alloc_med_io = alloc_med_io
   my_nml % alloc_slow_io = alloc_slow_io
   my_nml % dpm_rpm_ratio_io = dpm_rpm_ratio_io
+  my_nml % burnt_veg_to_inert_frac_io = burnt_veg_to_inert_frac_io
+  my_nml % burnt_veg_to_rpm_frac_io = burnt_veg_to_rpm_frac_io
+  my_nml % tau_pyc_io = tau_pyc_io
   my_nml % retran_r_io = retran_r_io
   my_nml % retran_l_io = retran_l_io
 END IF
@@ -206,6 +228,7 @@ IF (mype /= 0) THEN
   harvest_type_io = my_nml % harvest_type_io
   ag_expand_io = my_nml % ag_expand_io
   harvest_ht_io = my_nml % harvest_ht_io
+  burnt_veg_to_atmos_frac_io  = my_nml % burnt_veg_to_atmos_frac_io
   g_area_io  = my_nml % g_area_io
   g_grow_io  = my_nml % g_grow_io
   g_root_io  = my_nml % g_root_io
@@ -216,6 +239,9 @@ IF (mype /= 0) THEN
   alloc_med_io = my_nml % alloc_med_io
   alloc_slow_io = my_nml % alloc_slow_io
   dpm_rpm_ratio_io = my_nml % dpm_rpm_ratio_io
+  burnt_veg_to_inert_frac_io = my_nml % burnt_veg_to_inert_frac_io
+  burnt_veg_to_rpm_frac_io = my_nml % burnt_veg_to_rpm_frac_io
+  tau_pyc_io = my_nml % tau_pyc_io
   retran_r_io      = my_nml % retran_r_io
   retran_l_io      = my_nml % retran_l_io
 END IF

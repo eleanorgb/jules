@@ -58,7 +58,12 @@ TYPE :: trif_vars_data_type
   REAL(KIND=real_jlslsm), ALLOCATABLE :: wp_slow_out_gb(:)
                         ! C output from slow-turnover wood product pool
                         ! (kg/m2/360days).
-
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_c_fire_gb(:)
+                        ! GBM veg-to-soil carbon flux due to fire
+                        ! (kg/m2/360days)
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_c_fire_to_pyc_gb(:)
+                        ! GBM veg-to-pyc soil carbon flux due to fire
+                        ! (kg/m2/360days)
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_c_orig_pft(:,:)
                         ! Loss of vegetation carbon due to litter,
                         ! landuse change and fire (kg/m2/360days).
@@ -73,28 +78,32 @@ TYPE :: trif_vars_data_type
                         ! this flux is removed from vegetation and not added
                         ! to any other store (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_c_fire_pft(:,:)
-                        ! Loss of vegetation carbon due to fire (kg/m2/360days).
+                        ! PFT veg-to-soil carbon flux due to fire
+                        ! (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_c_nofire_pft(:,:)
-                        ! Loss of vegetation carbon due to litter and
+                        ! PFT veg-to-soil carbon flux due to litter and
                         ! landuse change (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: burnt_carbon_dpm(:)
                         ! Loss of DPM carbon due fire (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_n_fire_pft(:,:)
-                        ! Loss of vegetation nitrogen due to fire
+                        ! PFT veg-to-soil nitrogen flux due to fire
                         ! (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: lit_n_nofire_pft(:,:)
-                        ! Loss of vegetation nitrogen due to litter and
+                        ! PFT veg-to-soil nitrogen flux due litter and
                         ! landuse change (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: burnt_carbon_rpm(:)
                         ! Loss of RPM carbon due fire (kg/m2/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: veg_c_fire_emission_gb(:)
-                        ! Gridbox mean carbon flux to the atmosphere from fire
-                        ! (kg/(m2 land)/yr).
+                        ! GBM veg-to-atmos carbon flux due to fire
+                        ! (kg/(m2 land)/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: veg_c_fire_emission_pft(:,:)
-                        ! Carbon flux to the atmosphere from fire per PFT
-                        ! (kg/(m2 PFT)/yr).
+                        ! PFT veg-to-atmos carbon flux due to fire
+                        ! (kg/(m2 PFT)/360days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: resp_s_to_atmos_gb(:,:)
                         ! Soil-to-atmosphere respiration flux
+                        ! [kg m-2 (360 day)-1].
+  REAL(KIND=real_jlslsm), ALLOCATABLE :: resp_pyc_gb(:,:)
+                        ! Pyc-soil-to-atmosphere respiration flux
                         ! [kg m-2 (360 day)-1].
   REAL(KIND=real_jlslsm), ALLOCATABLE :: root_abandon_pft(:,:)
                         ! Root carbon moved to soil carbon during
@@ -297,7 +306,7 @@ TYPE :: trif_vars_data_type
   REAL(KIND=real_jlslsm), ALLOCATABLE :: n_gas_gb(:,:)
                         ! Mineralised N Gas Emmissions (kg/m2/360 days).
   REAL(KIND=real_jlslsm), ALLOCATABLE :: dpm_ratio_gb(:)
-                        ! Ratio of Decomposatble Plant Material to Resistant.
+                        ! Ratio of Decompostable Plant Material to Resistant.
   REAL(KIND=real_jlslsm), ALLOCATABLE :: dnveg_pft(:,:)
                         ! Increment in veg N on PFTs (kg m-2 per TRIFFID
                         ! timestep).
@@ -419,6 +428,8 @@ TYPE :: trif_vars_type
   REAL(KIND=real_jlslsm), POINTER :: wp_fast_out_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: wp_med_out_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: wp_slow_out_gb(:)
+  REAL(KIND=real_jlslsm), POINTER :: lit_c_fire_gb(:)
+  REAL(KIND=real_jlslsm), POINTER :: lit_c_fire_to_pyc_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: lit_c_orig_pft(:,:)
   REAL(KIND=real_jlslsm), POINTER :: lit_c_ag_pft(:,:)
   REAL(KIND=real_jlslsm), POINTER :: lit_n_orig_pft(:,:)
@@ -432,6 +443,7 @@ TYPE :: trif_vars_type
   REAL(KIND=real_jlslsm), POINTER :: veg_c_fire_emission_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: veg_c_fire_emission_pft(:,:)
   REAL(KIND=real_jlslsm), POINTER :: resp_s_to_atmos_gb(:,:)
+  REAL(KIND=real_jlslsm), POINTER :: resp_pyc_gb(:,:)
   REAL(KIND=real_jlslsm), POINTER :: root_abandon_pft(:,:)
   REAL(KIND=real_jlslsm), POINTER :: root_abandon_gb(:)
   REAL(KIND=real_jlslsm), POINTER :: harvest_pft(:,:)
@@ -648,6 +660,8 @@ ALLOCATE(trif_vars_data%wp_slow_in_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%wp_fast_out_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%wp_med_out_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%wp_slow_out_gb(land_pts_dim))
+ALLOCATE(trif_vars_data%lit_c_fire_gb(land_pts_dim))
+ALLOCATE(trif_vars_data%lit_c_fire_to_pyc_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%lit_c_orig_pft(land_pts_dim,npft_dim))
 ALLOCATE(trif_vars_data%lit_c_ag_pft(land_pts_dim,npft_dim))
 ALLOCATE(trif_vars_data%lit_c_fire_pft(land_pts_dim,npft_dim))
@@ -663,6 +677,8 @@ trif_vars_data%wp_slow_in_gb(:)             = 0.0
 trif_vars_data%wp_fast_out_gb(:)            = 0.0
 trif_vars_data%wp_med_out_gb(:)             = 0.0
 trif_vars_data%wp_slow_out_gb(:)            = 0.0
+trif_vars_data%lit_c_fire_gb(:)             = 0.0
+trif_vars_data%lit_c_fire_to_pyc_gb(:)      = 0.0
 trif_vars_data%lit_c_orig_pft(:,:)          = 0.0
 trif_vars_data%lit_c_ag_pft(:,:)            = 0.0
 trif_vars_data%lit_c_fire_pft(:,:)          = 0.0
@@ -678,6 +694,7 @@ ALLOCATE(trif_vars_data%cnsrv_veg_triffid_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%cnsrv_soil_triffid_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%cnsrv_prod_triffid_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%resp_s_to_atmos_gb(land_pts_dim,dim_cslayer_dim))
+ALLOCATE(trif_vars_data%resp_pyc_gb(land_pts_dim,dim_cslayer_dim))
 ALLOCATE(trif_vars_data%root_abandon_pft(land_pts_dim,npft_dim))
 ALLOCATE(trif_vars_data%root_abandon_gb(land_pts_dim))
 ALLOCATE(trif_vars_data%cnsrv_nitrogen_triffid_gb(land_pts_dim))
@@ -720,6 +737,7 @@ trif_vars_data%cnsrv_veg_triffid_gb(:)      = 0.0
 trif_vars_data%cnsrv_soil_triffid_gb(:)     = 0.0
 trif_vars_data%cnsrv_prod_triffid_gb(:)     = 0.0
 trif_vars_data%resp_s_to_atmos_gb(:,:)      = 0.0
+trif_vars_data%resp_pyc_gb(:,:)             = 0.0
 trif_vars_data%root_abandon_pft(:,:)        = 0.0
 trif_vars_data%root_abandon_gb(:)           = 0.0
 trif_vars_data%cnsrv_nitrogen_triffid_gb(:) = 0.0
@@ -746,8 +764,8 @@ trif_vars_data%lit_n_pft_diag(:,:)          = 0.0
 trif_vars_data%n_luc(:)                     = 0.0
 trif_vars_data%g_burn_pft_acc(:,:)          = 0.0
 trif_vars_data%g_burn_gb(:)                 = 0.0
-trif_vars_data%burnt_carbon_dpm             = 0.0
-trif_vars_data%burnt_carbon_rpm             = 0.0
+trif_vars_data%burnt_carbon_dpm(:)          = 0.0
+trif_vars_data%burnt_carbon_rpm(:)          = 0.0
 trif_vars_data%gpp_gb_out(:)                = 0.0
 trif_vars_data%gpp_pft_out(:,:)             = 0.0
 trif_vars_data%gpp_gb_acc(:)                = 0.0
@@ -934,6 +952,8 @@ DEALLOCATE(trif_vars_data%wp_slow_in_gb)
 DEALLOCATE(trif_vars_data%wp_fast_out_gb)
 DEALLOCATE(trif_vars_data%wp_med_out_gb)
 DEALLOCATE(trif_vars_data%wp_slow_out_gb)
+DEALLOCATE(trif_vars_data%lit_c_fire_gb)
+DEALLOCATE(trif_vars_data%lit_c_fire_to_pyc_gb)
 DEALLOCATE(trif_vars_data%lit_c_orig_pft)
 DEALLOCATE(trif_vars_data%lit_c_ag_pft)
 DEALLOCATE(trif_vars_data%lit_c_fire_pft)
@@ -949,6 +969,7 @@ DEALLOCATE(trif_vars_data%cnsrv_veg_triffid_gb)
 DEALLOCATE(trif_vars_data%cnsrv_soil_triffid_gb)
 DEALLOCATE(trif_vars_data%cnsrv_prod_triffid_gb)
 DEALLOCATE(trif_vars_data%resp_s_to_atmos_gb)
+DEALLOCATE(trif_vars_data%resp_pyc_gb)
 DEALLOCATE(trif_vars_data%root_abandon_pft)
 DEALLOCATE(trif_vars_data%root_abandon_gb)
 DEALLOCATE(trif_vars_data%cnsrv_nitrogen_triffid_gb)
@@ -1101,6 +1122,8 @@ trif_vars%wp_slow_in_gb => trif_vars_data%wp_slow_in_gb
 trif_vars%wp_fast_out_gb => trif_vars_data%wp_fast_out_gb
 trif_vars%wp_med_out_gb => trif_vars_data%wp_med_out_gb
 trif_vars%wp_slow_out_gb => trif_vars_data%wp_slow_out_gb
+trif_vars%lit_c_fire_gb => trif_vars_data%lit_c_fire_gb
+trif_vars%lit_c_fire_to_pyc_gb => trif_vars_data%lit_c_fire_to_pyc_gb
 trif_vars%lit_c_orig_pft => trif_vars_data%lit_c_orig_pft
 trif_vars%lit_c_ag_pft => trif_vars_data%lit_c_ag_pft
 trif_vars%lit_c_fire_pft => trif_vars_data%lit_c_fire_pft
@@ -1116,6 +1139,7 @@ trif_vars%cnsrv_veg_triffid_gb => trif_vars_data%cnsrv_veg_triffid_gb
 trif_vars%cnsrv_soil_triffid_gb => trif_vars_data%cnsrv_soil_triffid_gb
 trif_vars%cnsrv_prod_triffid_gb => trif_vars_data%cnsrv_prod_triffid_gb
 trif_vars%resp_s_to_atmos_gb => trif_vars_data%resp_s_to_atmos_gb
+trif_vars%resp_pyc_gb => trif_vars_data%resp_pyc_gb
 trif_vars%root_abandon_pft => trif_vars_data%root_abandon_pft
 trif_vars%root_abandon_gb => trif_vars_data%root_abandon_gb
 trif_vars%cnsrv_nitrogen_triffid_gb => trif_vars_data%cnsrv_nitrogen_triffid_gb
@@ -1266,6 +1290,8 @@ NULLIFY(trif_vars%wp_slow_in_gb)
 NULLIFY(trif_vars%wp_fast_out_gb)
 NULLIFY(trif_vars%wp_med_out_gb)
 NULLIFY(trif_vars%wp_slow_out_gb)
+NULLIFY(trif_vars%lit_c_fire_gb)
+NULLIFY(trif_vars%lit_c_fire_to_pyc_gb)
 NULLIFY(trif_vars%lit_c_orig_pft)
 NULLIFY(trif_vars%lit_c_ag_pft)
 NULLIFY(trif_vars%lit_c_fire_pft)
@@ -1281,6 +1307,7 @@ NULLIFY(trif_vars%cnsrv_veg_triffid_gb)
 NULLIFY(trif_vars%cnsrv_soil_triffid_gb)
 NULLIFY(trif_vars%cnsrv_prod_triffid_gb)
 NULLIFY(trif_vars%resp_s_to_atmos_gb)
+NULLIFY(trif_vars%resp_pyc_gb)
 NULLIFY(trif_vars%root_abandon_pft)
 NULLIFY(trif_vars%root_abandon_gb)
 NULLIFY(trif_vars%cnsrv_nitrogen_triffid_gb)

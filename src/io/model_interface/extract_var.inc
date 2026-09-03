@@ -415,6 +415,14 @@ CASE ( 'canopy_gb' )
   cube_land = cube_from_array(surftiles_to_gbm( progs%canopy_surft, ainfo ))
   cube = map_from_land(cube_land)
 
+CASE ( 'inert_pyc' )
+  cube_land = cube_from_array(progs%pyc_inert_c_pool_gb(:,:))
+  cube = map_from_land(cube_land)
+
+CASE ( 'resp_pyc_gb' )
+  cube_land = cube_from_array(trif_vars%resp_pyc_gb(:,:))
+  cube = map_from_land(cube_land)
+
 CASE ( 'cs_gb' )
   IF ( nsoilt == 1) THEN
     !Case for a single soil tile
@@ -1626,6 +1634,14 @@ CASE ( 'cnsrv_n_inorg_triffid' )
 
 CASE ( 'lit_c_fire' )
   cube_land = cube_from_array(REAL(trif_vars%lit_c_fire_pft))
+  cube = map_from_land(cube_land)
+
+CASE ( 'lit_c_fire_gb' )
+  cube_land = cube_from_array(REAL(trif_vars%lit_c_fire_gb))
+  cube = map_from_land(cube_land)
+
+CASE ( 'lit_c_fire_to_pyc_gb' )
+  cube_land = cube_from_array(REAL(trif_vars%lit_c_fire_to_pyc_gb))
   cube = map_from_land(cube_land)
 
 CASE ( 'burnt_carbon_dpm' )

@@ -1131,6 +1131,7 @@ CASE ( jules )
           trifctltype%resp_w_dr_out_pft, qbase_l_soilt,                        &
           psparms%sthf_soilt, psparms%sthu_soilt,                              &
           w_flux_soilt, progs%t_soil_soilt,progs%cs_pool_soilt,                &
+          progs%pyc_inert_c_pool_gb,                                           &
           progs%frac_c_label_pool_soilt,                                       &
           !New arguments replacing USE statements
           !trif_vars_mod (IN OUT)

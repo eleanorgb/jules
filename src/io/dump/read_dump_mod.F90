@@ -225,7 +225,7 @@ DO i = 1,nvars
       CALL file_read_var(FILE, var_ids(i),                                     &
                          global_data_3d(:,1:nsoilt,1:sm_levels))
 
-    CASE ( 'n_inorg' )
+    CASE ( 'n_inorg', 'inert_pyc' )
       CALL file_read_var(FILE, var_ids(i),                                     &
                          global_data_2d(:,1:dim_cslayer))
 
@@ -586,6 +586,12 @@ DO i = 1,nvars
   CASE ( 'cropcanht' )
     DO n = 1,ncpft
       CALL scatter_land_field(global_data_2d(:,n), crop_vars%cropcanht_cpft(:,n))
+    END DO
+
+  CASE ( 'inert_pyc' )
+    DO m = 1,dim_cslayer
+      CALL scatter_land_field(global_data_2d(:,m),                             &
+                              progs%pyc_inert_c_pool_gb(:,m))
     END DO
 
   CASE ( 'cs' )

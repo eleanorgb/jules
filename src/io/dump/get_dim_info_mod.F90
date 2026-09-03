@@ -213,7 +213,7 @@ CASE ( 'sthuf_soilt', 't_soil_soilt', 'sthu_irr_soilt' )
   dim_names(1:ndims) = [ land_dim_name, soilt_dim_name, soil_dim_name ]
   dim_sizes(1:ndims) = [ global_land_pts, nsoilt, sm_levels ]
 
-CASE ( 'n_inorg' )
+CASE ( 'n_inorg', 'inert_pyc' )
   ndims = 2
   dim_names(1:ndims) = [ land_dim_name, sclayer_dim_name ]
   dim_sizes(1:ndims) = [ global_land_pts, dim_cslayer ]

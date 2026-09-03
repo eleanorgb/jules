@@ -24,7 +24,7 @@ SUBROUTINE veg_control(                                                        &
   c_veg_pft, cv_gb, lit_c_pft, lit_c_mn_gb, g_leaf_day_pft, g_leaf_phen_pft,   &
   lai_phen_pft, g_leaf_dr_out_pft, npp_dr_out_pft, resp_w_dr_out_pft,          &
   qbase_l_soilt, sthf_soilt, sthu_soilt, w_flux_soilt,                         &
-  t_soil_soilt, cs_pool_soilt, frac_c_label_pool_soilt,                        &
+  t_soil_soilt, cs_pool_soilt, pyc_inert_c_pool_gb, frac_c_label_pool_soilt,   &
   !New arguments replacing USE statements
   !trif_vars_mod (IN OUT)
   trif_vars,                                                                   &
@@ -144,6 +144,7 @@ REAL(KIND=real_jlslsm), INTENT(IN OUT) ::                                      &
   canht_pft(land_pts,npft),                                                    &
   clay_soilt(land_pts,nsoilt,dim_cslayer),                                     &
   frac_c_label_pool_soilt(land_pts,nsoilt,dim_cslayer,dim_cs1),                &
+  pyc_inert_c_pool_gb(land_pts,dim_cslayer),                                   &
   cs_pool_soilt(land_pts,nsoilt,dim_cslayer,dim_cs1)
 
 REAL(KIND=real_jlslsm), INTENT(OUT) ::                                         &
@@ -331,7 +332,8 @@ IF ((phenol_call == 0) .OR. (triffid_call == 0)) THEN
                asteps_since_triffid,                                           &
                g_leaf_acc_pft, g_leaf_phen_acc_pft, npp_acc_pft,               &
                trifctltype%resp_s_acc_soilt(:,1,:,:), resp_w_acc_pft,          &
-               cs_pool_soilt(:,1,:,:), frac_c_label_pool_soilt(:,1,:,:),       &
+               cs_pool_soilt(:,1,:,:), pyc_inert_c_pool_gb,                    &
+               frac_c_label_pool_soilt(:,1,:,:),                               &
                frac_surft, lai_pft, canht_pft,                                 &
                catch_snow_surft, catch_surft, infil_surft,                     &
                z0_surft, z0h_bare_surft, c_veg_pft, cv_gb,                     &
@@ -417,7 +419,8 @@ IF ( triffid_call == 0 ) THEN
             ,asteps_since_triffid                                              &
             ,g_leaf_acc_pft, g_leaf_phen_acc_pft, npp_acc_pft                  &
             ,trifctltype%resp_s_acc_soilt(:,m,:,:), resp_w_acc_pft             &
-            ,cs_pool_soilt(:,m,:,:), frac_c_label_pool_soilt(:,m,:,:)          &
+            ,cs_pool_soilt(:,m,:,:), pyc_inert_c_pool_gb                       &
+            , frac_c_label_pool_soilt(:,1,:,:)                                 &
             ,frac_surft, lai_pft, canht_pft                                    &
             ,catch_snow_surft, catch_surft, infil_surft                        &
             ,z0_surft, z0h_bare_surft, c_veg_pft, cv_gb                        &

@@ -163,6 +163,12 @@ LOGICAL ::                                                                     &
 !   ancillary if provided, and is 0 if not provided
        !   F => g_burn is calculated via ancillary if provided, and is 0 if
 !   not provided
+  l_soil_pyc = .FALSE.,                                                        &
+      ! Switch used to for developing the pyrogenic soil carbon needs
+      ! l_trif_fire to be TRUE
+   l_use_flammability = .FALSE.,                                               &
+      ! If l_pyc determine whether we use flammability to determine 
+      ! allocation between pools
    l_use_pft_psi = .FALSE.,                                                    &
        ! Switch used to control what parameters are used in the calculation
        ! of the soil moisture stress factor
@@ -343,7 +349,7 @@ NAMELIST  / jules_vegetation/                                                  &
     phenol_period, triffid_period, l_trait_phys, l_ht_compete,                 &
     l_bvoc_emis, l_o3_damage, can_model, can_rad_mod, ilayers,                 &
     frac_min, frac_seed, pow, l_landuse, l_leaf_n_resp_fix, l_stem_resp_fix,   &
-    l_nitrogen, l_vegcan_soilfx, l_trif_crop, l_trif_fire,                     &
+    l_nitrogen, l_vegcan_soilfx, l_trif_crop, l_trif_fire, l_soil_pyc,         &
     l_inferno, ignition_method, l_vegdrag_pft, l_rsl_scalar,                   &
     cd_leaf, c1_usuh, c2_usuh, c3_usuh, dsj_coef, dsv_coef, jv25_coef,         &
     act_j_coef, act_v_coef,                                                    &
@@ -354,6 +360,7 @@ NAMELIST  / jules_vegetation/                                                  &
     l_prescsow, l_recon,l_gleaf_fix,                                           &
     l_scale_resp_pm, l_use_pft_psi, fsmc_shape, l_croprotate,                  &
     l_trif_biocrop, l_ag_expand, l_sugar,                                      &
+  l_use_flammability,                                                         &
     ! RED variables
     l_red
 
@@ -433,16 +440,23 @@ END IF
 
 ! Check options that depend on TRIFFID if it is not enabled
 IF ( .NOT. l_triffid .AND. ANY( [ l_veg_compete, l_trif_eq, l_landuse,         &
-   l_ht_compete, l_nitrogen, l_trif_crop, l_trif_fire, l_trif_biocrop,         &
-   l_ag_expand ] ) ) THEN
+   l_ht_compete, l_nitrogen, l_trif_crop, l_trif_fire, l_soil_pyc,             &
+   l_trif_biocrop, l_ag_expand ] ) ) THEN
   errcode = 101
   WRITE(jules_message,'(A,8(1x,L1))')                                          &
      'These should be false when l_triffid = F: l_veg_compete, ' //            &
      'l_trif_eq, l_landuse, l_ht_compete, l_nitrogen, l_trif_crop, ' //        &
-     'l_trif_fire, l_trif_biocrop, l_ag_expand = ', l_veg_compete, l_trif_eq,  &
-     l_landuse, l_ht_compete, l_nitrogen, l_trif_crop, l_trif_fire,            &
+     'l_trif_fire, l_soil_pyc, l_trif_biocrop, l_ag_expand = ',                &
+     l_veg_compete, l_trif_eq, l_landuse,                                      &
+     l_ht_compete, l_nitrogen, l_trif_crop, l_trif_fire, l_soil_pyc,           &
      l_trif_biocrop, l_ag_expand
   CALL ereport( "check_jules_vegetation", errcode, jules_message )
+END IF
+
+IF ( l_use_flammability .AND. .NOT. l_soil_pyc ) THEN
+  errcode = 101
+  CALL ereport("check_jules_vegetation", errcode,                              &
+               'l_use_flammability is on but pyc not used in model')
 END IF
 
 ! Always make sure that a veg version is selected
@@ -858,6 +872,12 @@ CALL jules_print('jules_vegetation_mod',lineBuffer)
 WRITE(lineBuffer,*)' l_trif_fire = ',l_trif_fire
 CALL jules_print('jules_vegetation_mod',lineBuffer)
 
+WRITE(lineBuffer,*)' l_soil_pyc = ',l_soil_pyc
+CALL jules_print('jules_vegetation_mod',lineBuffer)
+
+WRITE(lineBuffer,*)' l_use_flammability = ',l_use_flammability
+CALL jules_print('jules_vegetation_mod',lineBuffer)
+
 WRITE(lineBuffer,*)' l_trait_phys = ',l_trait_phys
 CALL jules_print('jules_vegetation_mod',lineBuffer)
 
@@ -1020,7 +1040,7 @@ CHARACTER(LEN=errormessagelength) :: iomessage
 INTEGER, PARAMETER :: no_of_types = 3
 INTEGER, PARAMETER :: n_int = 11
 INTEGER, PARAMETER :: n_real = 11 + (n_photo_coef * 5)
-INTEGER, PARAMETER :: n_log = 29 + npft_max
+INTEGER, PARAMETER :: n_log = 31 + npft_max
 
 TYPE :: my_namelist
   SEQUENCE
@@ -1067,6 +1087,8 @@ TYPE :: my_namelist
   LOGICAL :: l_trif_biocrop
   LOGICAL :: l_ag_expand
   LOGICAL :: l_trif_fire
+  LOGICAL :: l_soil_pyc
+  LOGICAL :: l_use_flammability
   LOGICAL :: l_landuse
   LOGICAL :: l_nitrogen
   LOGICAL :: l_recon
@@ -1141,6 +1163,8 @@ IF (mype == 0) THEN
   my_nml % l_trif_biocrop  = l_trif_biocrop
   my_nml % l_ag_expand     = l_ag_expand
   my_nml % l_trif_fire     = l_trif_fire
+  my_nml % l_soil_pyc      = l_soil_pyc
+  my_nml % l_use_flammability = l_use_flammability
   my_nml % l_landuse       = l_landuse
   my_nml % l_nitrogen      = l_nitrogen
   my_nml % l_recon         = l_recon
@@ -1204,6 +1228,8 @@ IF (mype /= 0) THEN
   l_trif_biocrop  = my_nml % l_trif_biocrop
   l_ag_expand     = my_nml % l_ag_expand
   l_trif_fire     = my_nml % l_trif_fire
+  l_soil_pyc     = my_nml % l_soil_pyc
+  l_use_flammability = my_nml % l_use_flammability
   l_landuse       = my_nml % l_landuse
   l_nitrogen      = my_nml % l_nitrogen
   l_recon         = my_nml % l_recon

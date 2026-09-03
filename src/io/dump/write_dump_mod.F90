@@ -352,6 +352,12 @@ DO i = 1,nvars
       END DO
     END DO
 
+  CASE ( 'inert_pyc' )
+      DO m = 1,dim_cslayer
+        CALL gather_land_field(progs%pyc_inert_c_pool_gb(:,m),                 &
+                               global_data_2d(:,m))
+    END DO
+
   CASE ( 'plantNumDensity' )
     DO n = 1,npft
       DO m = 1,nmasst
@@ -1001,7 +1007,7 @@ DO i = 1,nvars
       CALL file_write_var(FILE, var_ids(i),                                    &
                           global_data_3d(:,1:nsoilt,1:sm_levels))
 
-    CASE ( 'n_inorg')
+    CASE ( 'n_inorg', 'inert_pyc')
       CALL file_write_var(FILE, var_ids(i),                                    &
                           global_data_2d(:,1:dim_cslayer))
 
